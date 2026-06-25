@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { ArrowLeft, Send, Smile, Plus, Image, Camera, Gamepad2, FileText, Edit3 } from 'lucide-react'
 import type { Message } from '../types'
 import { sendMessage, extractMemories } from '../api/deepseek'
+import { retrieveMemories, saveMemory } from '../api/memory'
 import EmojiPicker from '../components/EmojiPicker'
 import TicTacToe from '../components/TicTacToe'
 
@@ -34,12 +35,23 @@ export default function ChatScreen({ store, onBack }: Props) {
     const asstMsg: Message = { id: (Date.now()+1).toString(), role: 'assistant', content: '', timestamp: new Date() }
     store.addMessage(conv.id, asstMsg)
     try {
+      // 从 Ombre-Brain 检索相关记忆
+      const ombreMemories = await retrieveMemories(text)
+      const allMemories = [...store.memories, ...ombreMemories.map((m: string) => ({ id: '', content: m, source: 'ombre', createdAt: new Date() }))]
+
       const allMsgs = [...conv.messages, userMsg]
       let acc = ''
-      await sendMessage(allMsgs, store.memories, conv.aiName, chunk => {
+      await sendMessage(allMsgs, allMemories, conv.aiName, chunk => {
         acc += chunk; store.updateLastMessage(conv.id, acc)
       })
-      extractMemories(text, acc).then((facts: string[]) => facts.forEach((f: string) => store.addMemory(f, conv.id)))
+
+      // 同时保存到本地和 Ombre-Brain
+      extractMemories(text, acc).then((facts: string[]) => {
+        facts.forEach((f: string) => {
+          store.addMemory(f, conv.id)
+          saveMemory(f)
+        })
+      })
     } catch (e: any) { store.updateLastMessage(conv.id, `❌ ${e.message}`) }
     setLoading(false)
   }
