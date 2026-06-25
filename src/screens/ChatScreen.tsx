@@ -6,6 +6,7 @@ import { retrieveMemories, saveMemory } from '../api/memory'
 import EmojiPicker from '../components/EmojiPicker'
 import TicTacToe from '../components/TicTacToe'
 import ThinkingBubble from '../components/ThinkingBubble'
+import { shouldSearch, tavilySearch, formatSearchContext } from '../api/search'
 
 const EMOJI_AVATARS = ['🌸','🌙','⭐','🦊','🐱','🌈','💫','🍀','🎀','🤖','🦋','🌺']
 const AI_NAMES = ['小语','晴晴','星星','小鹿','暖暖','云朵','小月','糖糖']
@@ -44,6 +45,7 @@ export default function ChatScreen({ store, onBack, onViewProfile, onCustomInstr
   const [showColorPicker, setShowColorPicker] = useState(false)
   const [bubbleColor, setBubbleColor] = useState(() => localStorage.getItem('bubbleColor') || 'rgba(149,236,105,0.55)')
   const [thinkingMap, setThinkingMap] = useState<Record<string, string>>({})
+  const [searchStatus, setSearchStatus] = useState<string>('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
   const photoRef = useRef<HTMLInputElement>(null)
@@ -109,11 +111,34 @@ write_diary=true 表示你想写今天的日记`
     try {
       const ombreMemories = await retrieveMemories(t)
       const allMems = [...store.memories, ...ombreMemories.map((m: string) => ({ id:'', content:m, source:'ombre', createdAt:new Date() }))]
+
+      // DeepSeek 自主判断是否需要搜索
+      let searchContext = ''
+      setSearchStatus('🔍 判断是否需要搜索...')
+      const { needed, query } = await shouldSearch(t)
+      if (needed) {
+        setSearchStatus(`🌐 搜索中："${query}"`)
+        try {
+          const results = await tavilySearch(query)
+          searchContext = formatSearchContext(results, query)
+          setSearchStatus(`✅ 找到 ${results.length} 条结果`)
+        } catch {
+          setSearchStatus('⚠️ 搜索失败，直接回复')
+        }
+      } else {
+        setSearchStatus('')
+      }
+
       const allMsgs = [...conv.messages, userMsg]
+      // 把搜索结果附加到最后一条用户消息
+      const msgsWithSearch = searchContext
+        ? [...allMsgs.slice(0, -1), { ...userMsg, content: userMsg.content + searchContext }]
+        : allMsgs
+
       let acc = ''
       let thinkAcc = ''
       await sendMessage(
-        allMsgs, allMems, conv.aiName,
+        msgsWithSearch, allMems, conv.aiName,
         chunk => { acc += chunk; store.updateLastMessage(conv.id, acc) },
         thinkChunk => {
           thinkAcc += thinkChunk
@@ -122,6 +147,7 @@ write_diary=true 表示你想写今天的日记`
         store.useReasoner,
         store.customInstruction
       )
+      setSearchStatus('')
       extractMemories(t, acc).then((facts: string[]) => facts.forEach((f: string) => { store.addMemory(f, conv.id); saveMemory(f) }))
       aiAutonomousAction(t, acc) // non-blocking
     } catch (e: any) { store.updateLastMessage(conv.id, `❌ ${e.message}`) }
@@ -277,6 +303,11 @@ write_diary=true 表示你想写今天的日记`
             </div>
           )
         })}
+        {searchStatus && (
+          <div className="search-status-bar">
+            <span>{searchStatus}</span>
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 
