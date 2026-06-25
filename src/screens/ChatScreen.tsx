@@ -9,6 +9,17 @@ import TicTacToe from '../components/TicTacToe'
 const EMOJI_AVATARS = ['🌸','🌙','⭐','🦊','🐱','🌈','💫','🍀','🎀','🤖','🦋','🌺']
 const AI_NAMES = ['小语','晴晴','星星','小鹿','暖暖','云朵','小月','糖糖']
 
+const BUBBLE_COLORS = [
+  { label: '薄荷绿', value: 'rgba(149,236,105,0.55)' },
+  { label: '天空蓝', value: 'rgba(120,190,255,0.55)' },
+  { label: '樱花粉', value: 'rgba(255,182,193,0.55)' },
+  { label: '薰衣草', value: 'rgba(200,170,230,0.55)' },
+  { label: '暖橙色', value: 'rgba(255,200,120,0.55)' },
+  { label: '珊瑚红', value: 'rgba(255,140,130,0.55)' },
+  { label: '奶茶色', value: 'rgba(220,190,160,0.55)' },
+  { label: '烟灰色', value: 'rgba(180,180,195,0.55)' },
+]
+
 interface Props { store: any; onBack: () => void; onViewProfile?: () => void }
 
 function shouldShowTime(msgs: Message[], idx: number): string {
@@ -29,6 +40,8 @@ export default function ChatScreen({ store, onBack, onViewProfile }: Props) {
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
   const [showGame, setShowGame] = useState(false)
   const [voiceMode, setVoiceMode] = useState(false)
+  const [showColorPicker, setShowColorPicker] = useState(false)
+  const [bubbleColor, setBubbleColor] = useState(() => localStorage.getItem('bubbleColor') || 'rgba(149,236,105,0.55)')
   const bottomRef = useRef<HTMLDivElement>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
   const photoRef = useRef<HTMLInputElement>(null)
@@ -128,7 +141,8 @@ write_diary=true 表示你想写今天的日记`
   const msgs = conv?.messages || []
 
   return (
-    <div className="wechat-chat" onClick={() => { setShowEmoji(false); setShowToolbar(false) }}>
+    <div className="wechat-chat" style={{ '--user-bubble-color': bubbleColor } as React.CSSProperties}
+      onClick={() => { setShowEmoji(false); setShowToolbar(false); setShowColorPicker(false) }}>
       <input ref={photoRef} type="file" accept="image/*" style={{ display:'none' }} onChange={e => e.target.files?.[0] && handleImageFile(e.target.files[0])} />
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display:'none' }} onChange={e => e.target.files?.[0] && handleImageFile(e.target.files[0])} />
       <input ref={aiPhotoRef} type="file" accept="image/*" style={{ display:'none' }} onChange={handleAiPhoto} />
@@ -142,8 +156,26 @@ write_diary=true 表示你想写今天的日记`
           </button>
           <div className="wc-status">在线</div>
         </div>
+        <button className="wc-color-dot" onClick={e => { e.stopPropagation(); setShowColorPicker(p => !p) }}
+          style={{ background: bubbleColor, border:'2px solid rgba(255,255,255,0.8)' }} title="气泡颜色" />
         <button className="wc-more">···</button>
       </div>
+
+      {/* BUBBLE COLOR PICKER */}
+      {showColorPicker && (
+        <div className="wc-color-picker" onClick={e => e.stopPropagation()}>
+          <div className="wc-color-title">选择气泡颜色</div>
+          <div className="wc-color-grid">
+            {BUBBLE_COLORS.map(c => (
+              <button key={c.value} className={`wc-color-item ${bubbleColor === c.value ? 'selected' : ''}`}
+                onClick={() => { setBubbleColor(c.value); localStorage.setItem('bubbleColor', c.value); setShowColorPicker(false) }}>
+                <div className="wc-color-swatch" style={{ background: c.value }} />
+                <span>{c.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* AVATAR PICKER */}
       {showAvatarPicker && (
