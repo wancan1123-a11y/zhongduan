@@ -257,6 +257,17 @@ body {
 .spin { animation: spinning 1s linear infinite; }
 @keyframes spinning { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
 
+.ombre-status { font-size: 11px; padding: 3px 10px; border-radius: 12px; margin-left: auto; }
+.ombre-status.online { color: #52c41a; background: #f6ffed; border: 1px solid #b7eb8f; }
+.ombre-status.offline { color: #ff4d4f; background: #fff2f0; border: 1px solid #ffccc7; }
+.memory-ombre-card { display: flex; align-items: center; gap: 12px; margin: 14px; padding: 16px; background: var(--card); border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 2px 12px rgba(0,0,0,0.05); cursor: pointer; }
+.memory-ombre-card:active { background: var(--card2); }
+.memory-ombre-icon { font-size: 28px; }
+.memory-ombre-info { flex: 1; }
+.memory-ombre-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.memory-ombre-sub { font-size: 12px; color: var(--text3); margin-top: 3px; }
+.memory-section-title { font-size: 12px; font-weight: 600; color: var(--text3); padding: 0 16px 8px; display: flex; align-items: center; }
+
 @media (min-width: 431px) {
   .app { border-radius: 20px; margin: 20px auto; height: calc(100vh - 40px); }
 }

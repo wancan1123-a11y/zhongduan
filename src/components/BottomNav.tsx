@@ -1,4 +1,4 @@
-import { Settings, Palette, Info } from 'lucide-react'
+import { Settings, Palette, Brain } from 'lucide-react'
 import type { Screen } from '../types'
 
 export default function BottomNav({ onNavigate }: { onNavigate: (s: Screen) => void }) {
@@ -10,8 +10,8 @@ export default function BottomNav({ onNavigate }: { onNavigate: (s: Screen) => v
       <button className="nav-btn" onClick={() => onNavigate('moments')}>
         <Palette size={20} strokeWidth={1.5} /><span>朋友圈</span>
       </button>
-      <button className="nav-btn" onClick={() => onNavigate('moments')}>
-        <Info size={20} strokeWidth={1.5} /><span>信息</span>
+      <button className="nav-btn" onClick={() => onNavigate('memory')}>
+        <Brain size={20} strokeWidth={1.5} /><span>记忆库</span>
       </button>
     </nav>
   )

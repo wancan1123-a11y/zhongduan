@@ -6,6 +6,7 @@ import ChatScreen from './screens/ChatScreen'
 import DiaryScreen from './screens/DiaryScreen'
 import MomentsScreen from './screens/MomentsScreen'
 import SettingsScreen from './screens/SettingsScreen'
+import MemoryScreen from './screens/MemoryScreen'
 import BottomNav from './components/BottomNav'
 import type { Screen } from './types'
 import './App.css'
@@ -25,6 +26,7 @@ export default function App() {
         {screen === 'diary' && <DiaryScreen store={store} onBack={() => go('home')} />}
         {screen === 'moments' && <MomentsScreen store={store} onBack={() => go('home')} />}
         {screen === 'settings' && <SettingsScreen store={store} onBack={() => go('home')} />}
+        {screen === 'memory' && <MemoryScreen store={store} onBack={() => go('home')} />}
       </div>
       {screen === 'home' && <BottomNav onNavigate={go} />}
     </div>
