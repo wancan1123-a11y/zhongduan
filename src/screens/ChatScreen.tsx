@@ -17,9 +17,9 @@ const BG_OPTIONS = [
   { label: '纸张', value: 'paper' },
 ]
 
-interface Props { store: any; onBack: () => void }
+interface Props { store: any; onBack: () => void; onViewProfile?: () => void }
 
-export default function ChatScreen({ store, onBack }: Props) {
+export default function ChatScreen({ store, onBack, onViewProfile }: Props) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [showEmoji, setShowEmoji] = useState(false)
@@ -175,20 +175,24 @@ export default function ChatScreen({ store, onBack }: Props) {
         {conv?.messages?.map((msg: Message) => (
           <div key={msg.id} className={`msg-row ${msg.role}`}>
             {msg.role === 'assistant' && (
-              <div className="msg-av">
+              <div className="msg-av ai-av" onClick={onViewProfile} style={{ cursor:'pointer' }}>
                 {conv.aiAvatar?.startsWith('data:')
                   ? <img src={conv.aiAvatar} style={{ width:34, height:34, borderRadius:10, objectFit:'cover' }} alt="" />
                   : conv.aiAvatar}
               </div>
             )}
-            <div className={`msg-bubble ${isImgMsg(msg.content) ? 'img-bubble' : ''}`}>
+            {msg.role === 'user' && (
+              <div className="msg-av user-av">
+                {store.userProfile?.avatar?.startsWith('data:')
+                  ? <img src={store.userProfile.avatar} style={{ width:34, height:34, borderRadius:10, objectFit:'cover' }} alt="" />
+                  : (store.userProfile?.avatar || '我')}
+              </div>
+            )}
+            <div className={`msg-bubble ${msg.role === 'user' ? 'user-bubble-glass' : 'ai-bubble-glass'} ${isImgMsg(msg.content) ? 'img-bubble' : ''}`}>
               {isImgMsg(msg.content)
                 ? <img src={getImgSrc(msg.content)} className="chat-img" alt="图片" />
                 : msg.content || (msg.role === 'assistant' && loading ? <span className="typing">···</span> : null)}
             </div>
-            {msg.role === 'user' && (
-              <div className="msg-av user-av">我</div>
-            )}
           </div>
         ))}
         <div ref={bottomRef} />

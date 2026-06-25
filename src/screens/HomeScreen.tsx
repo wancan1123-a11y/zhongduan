@@ -51,8 +51,20 @@ export default function HomeScreen({ store, onNavigate }: Props) {
   const todayStr = new Date().toISOString().slice(0, 10)
   const hasTodayDiary = store.diary.some((d: any) => d.date === todayStr)
 
+  const profile = store.userProfile
+
   return (
     <div className="home-screen">
+      {/* USER AVATAR TOP RIGHT */}
+      <div className="home-topbar">
+        <div className="home-greeting">终端</div>
+        <button className="home-user-avatar" onClick={() => onNavigate('profile')}>
+          {profile?.avatar?.startsWith('data:')
+            ? <img src={profile.avatar} alt="me" className="home-user-avatar-img" />
+            : <span>{profile?.avatar || '🙂'}</span>}
+        </button>
+      </div>
+
       {/* CLOCK */}
       <ClockWidget onClick={() => onNavigate('clock')} />
 

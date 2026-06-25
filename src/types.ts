@@ -57,4 +57,4 @@ export interface AiNote {
   createdAt: Date
 }
 
-export type Screen = 'home' | 'clock' | 'chat' | 'diary' | 'moments' | 'settings' | 'memory'
+export type Screen = 'home' | 'clock' | 'chat' | 'diary' | 'moments' | 'settings' | 'memory' | 'profile' | 'ai-profile'

@@ -1,6 +1,21 @@
 import { useState, useCallback } from 'react'
 import type { Conversation, Message, DiaryEntry, Memory, Moment, MusicTrack, AiNote } from '../types'
 
+export interface UserProfile {
+  avatar: string
+  name: string
+  bio: string
+  location: string
+  birthday: string
+  zodiac: string
+  mbti: string
+  mood: string
+}
+
+const DEFAULT_PROFILE: UserProfile = {
+  avatar: '🙂', name: '我', bio: '点击编辑个人简介...', location: '', birthday: '', zodiac: '', mbti: '', mood: ''
+}
+
 const DEFAULT_TRACKS: MusicTrack[] = [
   { id: '1', title: 'Clair de Lune', artist: 'Debussy', url: '' },
   { id: '2', title: 'River Flows in You', artist: 'Yiruma', url: '' },
@@ -41,6 +56,9 @@ export function useStore() {
   const [moments, setMoments] = useState<Moment[]>(() => ld('t_moments', [], (m: any) => ({ ...m, createdAt: new Date(m.createdAt) })))
   const [tracks, setTracks] = useState<MusicTrack[]>(() => ld('t_tracks', DEFAULT_TRACKS))
   const [aiNotes, setAiNotes] = useState<AiNote[]>(() => ld('t_ainotes', [], (n: any) => ({ ...n, createdAt: new Date(n.createdAt) })))
+  const [userProfile, setUserProfile] = useState<UserProfile>(() => {
+    try { return JSON.parse(localStorage.getItem('t_profile') || 'null') || DEFAULT_PROFILE } catch { return DEFAULT_PROFILE }
+  })
 
   const currentConversation = conversations.find(c => c.id === currentConvId) || conversations[0]
 
@@ -110,9 +128,14 @@ export function useStore() {
     setAiNotes(prev => sv('t_ainotes', [note, ...prev].slice(0, 10)) as AiNote[])
   }, [])
 
+  const updateUserProfile = useCallback((p: UserProfile) => {
+    setUserProfile(p); localStorage.setItem('t_profile', JSON.stringify(p))
+  }, [])
+
   return {
     conversations, currentConvId, currentConversation,
-    diary, memories, moments, tracks, aiNotes,
+    diary, memories, moments, tracks, aiNotes, userProfile,
+    updateUserProfile,
     setCurrentConvId, addMessage, updateLastMessage, updateConvSettings,
     addMemory, deleteMemory, addDiary, updateDiary,
     addMoment, toggleLike, addComment, addTrack, addAiNote,

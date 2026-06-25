@@ -9,6 +9,7 @@ interface Props { store: any; onBack: () => void }
 
 export default function DiaryScreen({ store, onBack }: Props) {
   const today = new Date()
+  const [tab, setTab] = useState<'user' | 'ai'>('user')
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
   const [selected, setSelected] = useState<string | null>(null)
@@ -22,8 +23,11 @@ export default function DiaryScreen({ store, onBack }: Props) {
   const firstDay = new Date(year, month, 1).getDay()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
 
+  const filteredDiary = store.diary.filter((d: DiaryEntry) =>
+    tab === 'ai' ? d.mood === '🤖' : d.mood !== '🤖'
+  )
   const diaryMap: Record<string, DiaryEntry> = {}
-  store.diary.forEach((d: DiaryEntry) => { diaryMap[d.date] = d })
+  filteredDiary.forEach((d: DiaryEntry) => { diaryMap[d.date] = d })
 
   const dateStr = (d: number) => `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
   const selectedEntry = selected ? diaryMap[selected] : null
@@ -58,13 +62,16 @@ export default function DiaryScreen({ store, onBack }: Props) {
     <div className="diary-screen">
       <div className="topbar">
         <button className="back-btn" onClick={onBack}><ArrowLeft size={22} /></button>
-        <span className="topbar-title">日记</span>
-        <div style={{ display:'flex', gap:8, marginLeft:'auto' }}>
-          <button className="icon-btn-secondary" onClick={aiWriteDiary} disabled={!selected || aiWriting} title="让AI写今天的日记">
-            <Bot size={18} />
-          </button>
-          <button className="icon-btn-primary" onClick={() => setWriting(true)}><Plus size={20} /></button>
+        <div className="diary-tabs">
+          <button className={`diary-tab ${tab==='user'?'active':''}`} onClick={() => setTab('user')}>我的</button>
+          <button className={`diary-tab ${tab==='ai'?'active':''}`} onClick={() => setTab('ai')}>AI 的</button>
         </div>
+        {tab === 'user'
+          ? <button className="icon-btn-primary" style={{ marginLeft:'auto' }} onClick={() => setWriting(true)}><Plus size={20} /></button>
+          : <button className="icon-btn-secondary" style={{ marginLeft:'auto' }} onClick={aiWriteDiary} disabled={!selected || aiWriting} title="让AI写今天的日记">
+              <Bot size={18} />
+            </button>
+        }
       </div>
 
       {/* CALENDAR */}
