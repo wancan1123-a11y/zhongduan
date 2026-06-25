@@ -1,8 +1,11 @@
-import { useState, useRef, useEffect } from 'react'
-import { ArrowLeft, Smile, Plus, Image, Camera, Gamepad2, Mic, Settings2, MapPin } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { ArrowLeft, Smile, Plus, Image, Camera, Gamepad2, Mic, Settings2, MapPin, Volume2, VolumeX, MicOff } from 'lucide-react'
 import type { Message } from '../types'
 import { sendMessage, extractMemories, generateMoment, generateAiDiary, generateDailyCare } from '../api/deepseek'
 import { retrieveMemories, saveMemory } from '../api/memory'
+import { analyzeImage } from '../api/vision'
+import { speak, stopSpeaking, startRecognition } from '../api/voice'
+import { reviewMemories, shouldReview, markReviewed } from '../api/memoryManager'
 import EmojiPicker from '../components/EmojiPicker'
 import TicTacToe from '../components/TicTacToe'
 import ThinkingBubble from '../components/ThinkingBubble'
@@ -42,12 +45,15 @@ export default function ChatScreen({ store, onBack, onViewProfile, onCustomInstr
   const [showToolbar, setShowToolbar] = useState(false)
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
   const [showGame, setShowGame] = useState(false)
-  const [voiceMode, setVoiceMode] = useState(false)
   const [showColorPicker, setShowColorPicker] = useState(false)
   const [bubbleColor, setBubbleColor] = useState(() => localStorage.getItem('bubbleColor') || 'rgba(149,236,105,0.55)')
   const [thinkingMap, setThinkingMap] = useState<Record<string, string>>({})
   const [searchStatus, setSearchStatus] = useState<string>('')
   const [locLoading, setLocLoading] = useState(false)
+  const [ttsEnabled, setTtsEnabled] = useState(() => localStorage.getItem('tts_enabled') === 'true')
+  const [isListening, setIsListening] = useState(false)
+  const [isSpeakingState, setIsSpeakingState] = useState(false)
+  const stopRecRef = useRef<(() => void) | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
   const photoRef = useRef<HTMLInputElement>(null)
@@ -58,6 +64,41 @@ export default function ChatScreen({ store, onBack, onViewProfile, onCustomInstr
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [conv?.messages?.length])
+
+  // 定期整理记忆
+  useEffect(() => {
+    if (shouldReview() && store.memories.length >= 8) {
+      reviewMemories(store.memories, conv?.aiName || 'AI').then(({ remove }) => {
+        remove.forEach((id: string) => store.deleteMemory(id))
+        markReviewed()
+      }).catch(() => {})
+    }
+  }, [])
+
+  // TTS 朗读 AI 最新回复
+  const speakLastReply = useCallback((text: string) => {
+    if (!ttsEnabled) return
+    setIsSpeakingState(true)
+    speak(text, () => setIsSpeakingState(false))
+  }, [ttsEnabled])
+
+  const toggleTts = () => {
+    const next = !ttsEnabled
+    setTtsEnabled(next)
+    localStorage.setItem('tts_enabled', String(next))
+    if (!next) stopSpeaking()
+  }
+
+  // 语音输入
+  const startVoiceInput = () => {
+    if (isListening) { stopRecRef.current?.(); setIsListening(false); return }
+    const stop = startRecognition(
+      text => { setInput(text); setIsListening(false) },
+      () => setIsListening(false)
+    )
+    if (stop) { stopRecRef.current = stop; setIsListening(true) }
+    else alert('浏览器不支持语音识别，请使用 Chrome')
+  }
 
   // AI 自主判断：让 AI 自己决定是否发朋友圈或写日记
   const aiAutonomousAction = async (userText: string, aiReply: string) => {
@@ -164,6 +205,7 @@ write_diary=true 表示你想写今天的日记`
         .then(note => { if (note) store.addAiNote(note) })
         .catch(() => {})
       setSearchStatus('')
+      speakLastReply(acc)
       extractMemories(t, acc).then((facts: string[]) => facts.forEach((f: string) => { store.addMemory(f, conv.id); saveMemory(f) }))
       aiAutonomousAction(t, acc) // non-blocking
     } catch (e: any) { store.updateLastMessage(conv.id, `❌ ${e.message}`) }
@@ -179,7 +221,22 @@ write_diary=true 表示你想写今天的日记`
 
   const handleImageFile = (file: File) => {
     const reader = new FileReader()
-    reader.onload = e => store.addMessage(conv.id, { id: Date.now().toString(), role: 'user', content: `[图片]\n${e.target?.result}`, timestamp: new Date() })
+    reader.onload = async e => {
+      const dataUrl = e.target?.result as string
+      store.addMessage(conv.id, { id: Date.now().toString(), role: 'user', content: `[图片]\n${dataUrl}`, timestamp: new Date() })
+      // AI 自动分析图片
+      setLoading(true)
+      const visionMsg: Message = { id: (Date.now()+1).toString(), role: 'assistant', content: '', timestamp: new Date() }
+      store.addMessage(conv.id, visionMsg)
+      try {
+        const desc = await analyzeImage(dataUrl, conv?.aiName || 'AI')
+        store.updateLastMessage(conv.id, desc)
+        speakLastReply(desc)
+      } catch {
+        store.updateLastMessage(conv.id, '（图片分析暂不可用）')
+      }
+      setLoading(false)
+    }
     reader.readAsDataURL(file)
   }
 
@@ -212,6 +269,12 @@ write_diary=true 表示你想写今天的日记`
         </div>
         <button className="wc-color-dot" onClick={e => { e.stopPropagation(); setShowColorPicker(p => !p) }}
           style={{ background: bubbleColor, border:'2px solid rgba(255,255,255,0.8)' }} title="气泡颜色" />
+        {/* TTS 开关 */}
+        <button className="wc-ci-btn" onClick={toggleTts} title={ttsEnabled ? 'AI 朗读已开' : 'AI 朗读已关'}>
+          {isSpeakingState
+            ? <Volume2 size={18} color="#07c160" className="pulse-icon" />
+            : ttsEnabled ? <Volume2 size={18} color="#07c160" /> : <VolumeX size={18} color="#aaa" />}
+        </button>
         <button className="wc-loc-btn" title={store.location ? `${store.location.city} ${store.location.weather || ''}` : '获取位置'}
           onClick={async () => {
             setLocLoading(true)
@@ -354,13 +417,15 @@ write_diary=true 表示你想写今天的日记`
           </div>
         )}
         <div className="wc-input-row">
-          <button className="wc-voice-btn" onClick={() => setVoiceMode(v => !v)}>
-            <Mic size={22} color={voiceMode ? '#07c160' : '#888'} />
+          <button className="wc-voice-btn" onClick={startVoiceInput} title="语音输入">
+            {isListening
+              ? <MicOff size={22} color="#ff4d4f" className="pulse-icon" />
+              : <Mic size={22} color="#888" />}
           </button>
-          {voiceMode
-            ? <button className="wc-voice-hold">按住 说话</button>
-            : <textarea ref={taRef} className="wc-textarea" value={input} onChange={onInput} onKeyDown={onKey} placeholder="发消息" rows={1} />
-          }
+          <textarea ref={taRef} className="wc-textarea" value={isListening ? '🎙️ 正在听...' : input}
+            onChange={onInput} onKeyDown={onKey}
+            placeholder={isListening ? '🎙️ 说话中...' : '发消息'} rows={1}
+            readOnly={isListening} />
           <button className="wc-emoji-btn" onClick={() => { setShowEmoji(p => !p); setShowToolbar(false) }}>
             <Smile size={22} color="#888" />
           </button>
