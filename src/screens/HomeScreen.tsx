@@ -33,7 +33,13 @@ export default function HomeScreen({ store, onNavigate }: Props) {
   const refreshNote = async () => {
     setNoteLoading(true)
     try {
-      const n = await generateDailyCare(store.memories, conv?.aiName || 'AI')
+      const n = await generateDailyCare({
+        memories: store.memories,
+        aiName: conv?.aiName || 'AI',
+        userProfile: store.userProfile,
+        diary: store.diary,
+        moments: store.moments,
+      })
       setNote(n); store.addAiNote(n)
     } catch { setNote('今天也要好好照顾自己哦 🌸') }
     setNoteLoading(false)

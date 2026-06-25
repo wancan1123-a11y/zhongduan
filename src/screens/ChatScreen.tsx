@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { ArrowLeft, Smile, Plus, Image, Camera, Gamepad2, Mic, Settings2, MapPin } from 'lucide-react'
 import type { Message } from '../types'
-import { sendMessage, extractMemories, generateMoment, generateAiDiary } from '../api/deepseek'
+import { sendMessage, extractMemories, generateMoment, generateAiDiary, generateDailyCare } from '../api/deepseek'
 import { retrieveMemories, saveMemory } from '../api/memory'
 import EmojiPicker from '../components/EmojiPicker'
 import TicTacToe from '../components/TicTacToe'
@@ -140,16 +140,29 @@ write_diary=true 表示你想写今天的日记`
       let acc = ''
       let thinkAcc = ''
       await sendMessage(
-        msgsWithSearch, allMems, conv.aiName,
+        msgsWithSearch,
+        {
+          memories: allMems,
+          aiName: conv.aiName,
+          custom: store.customInstruction,
+          location: store.location,
+          userProfile: store.userProfile,
+          diary: store.diary,
+          moments: store.moments,
+          tracks: store.tracks,
+        },
         chunk => { acc += chunk; store.updateLastMessage(conv.id, acc) },
         thinkChunk => {
           thinkAcc += thinkChunk
           setThinkingMap(prev => ({ ...prev, [asstMsg.id]: thinkAcc }))
         },
-        store.useReasoner,
-        store.customInstruction,
-        store.location
+        store.useReasoner
       )
+
+      // AI 对话后自动刷新叮嘱
+      generateDailyCare({ memories: allMems, aiName: conv.aiName, userProfile: store.userProfile, diary: store.diary, moments: store.moments })
+        .then(note => { if (note) store.addAiNote(note) })
+        .catch(() => {})
       setSearchStatus('')
       extractMemories(t, acc).then((facts: string[]) => facts.forEach((f: string) => { store.addMemory(f, conv.id); saveMemory(f) }))
       aiAutonomousAction(t, acc) // non-blocking
