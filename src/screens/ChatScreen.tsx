@@ -1,23 +1,25 @@
 import { useState, useRef, useEffect } from 'react'
-import { ArrowLeft, Send, Smile, Plus, Image, Camera, Gamepad2, Palette } from 'lucide-react'
+import { ArrowLeft, Smile, Plus, Image, Camera, Gamepad2, Mic } from 'lucide-react'
 import type { Message } from '../types'
-import { sendMessage, extractMemories } from '../api/deepseek'
+import { sendMessage, extractMemories, generateMoment, generateAiDiary } from '../api/deepseek'
 import { retrieveMemories, saveMemory } from '../api/memory'
 import EmojiPicker from '../components/EmojiPicker'
 import TicTacToe from '../components/TicTacToe'
 
 const EMOJI_AVATARS = ['🌸','🌙','⭐','🦊','🐱','🌈','💫','🍀','🎀','🤖','🦋','🌺']
 const AI_NAMES = ['小语','晴晴','星星','小鹿','暖暖','云朵','小月','糖糖']
-const BG_OPTIONS = [
-  { label: '默认', value: '' },
-  { label: '波点', value: 'dots' },
-  { label: '粉色', value: 'pink' },
-  { label: '薄荷', value: 'mint' },
-  { label: '星空', value: 'stars' },
-  { label: '纸张', value: 'paper' },
-]
 
 interface Props { store: any; onBack: () => void; onViewProfile?: () => void }
+
+function shouldShowTime(msgs: Message[], idx: number): string {
+  const d = new Date(msgs[idx].timestamp)
+  const fmt = `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`
+  if (idx === 0) return fmt
+  const prev = new Date(msgs[idx-1].timestamp).getTime()
+  const cur = d.getTime()
+  if (cur - prev > 5 * 60 * 1000) return fmt
+  return ''
+}
 
 export default function ChatScreen({ store, onBack, onViewProfile }: Props) {
   const [input, setInput] = useState('')
@@ -26,7 +28,7 @@ export default function ChatScreen({ store, onBack, onViewProfile }: Props) {
   const [showToolbar, setShowToolbar] = useState(false)
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
   const [showGame, setShowGame] = useState(false)
-  const [chatBg, setChatBg] = useState(() => localStorage.getItem('chatBg') || '')
+  const [voiceMode, setVoiceMode] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
   const photoRef = useRef<HTMLInputElement>(null)
@@ -34,7 +36,29 @@ export default function ChatScreen({ store, onBack, onViewProfile }: Props) {
   const aiPhotoRef = useRef<HTMLInputElement>(null)
   const conv = store.currentConversation
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [conv?.messages?.length])
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [conv?.messages?.length])
+
+  // AI 自主行为：对话后随机发动态或写日记
+  const aiAutonomousAction = async (_userText: string, _aiReply: string) => {
+    const rand = Math.random()
+    if (rand < 0.15) { // 15% 概率发朋友圈
+      try {
+        const text = await generateMoment(store.memories, conv?.aiName || 'AI')
+        store.addMoment({ id: Date.now().toString(), content: text, images: [], author: 'ai', likes: 0, liked: false, comments: [], createdAt: new Date() })
+      } catch {}
+    } else if (rand < 0.25) { // 10% 概率写日记
+      try {
+        const today = new Date().toISOString().slice(0,10)
+        const alreadyWrote = store.diary.some((d: any) => d.date === today && d.mood === '🤖')
+        if (!alreadyWrote) {
+          const content = await generateAiDiary(store.memories, today)
+          store.addDiary({ id: Date.now().toString(), date: today, content, mood: '🤖', createdAt: new Date() })
+        }
+      } catch {}
+    }
+  }
 
   const handleSend = async (text?: string) => {
     const t = (text || input).trim()
@@ -42,21 +66,18 @@ export default function ChatScreen({ store, onBack, onViewProfile }: Props) {
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: t, timestamp: new Date() }
     store.addMessage(conv.id, userMsg)
     setInput('')
-    if (taRef.current) taRef.current.style.height = 'auto'
+    if (taRef.current) { taRef.current.style.height = 'auto' }
     setLoading(true)
     const asstMsg: Message = { id: (Date.now()+1).toString(), role: 'assistant', content: '', timestamp: new Date() }
     store.addMessage(conv.id, asstMsg)
     try {
       const ombreMemories = await retrieveMemories(t)
-      const allMemories = [...store.memories, ...ombreMemories.map((m: string) => ({ id: '', content: m, source: 'ombre', createdAt: new Date() }))]
+      const allMems = [...store.memories, ...ombreMemories.map((m: string) => ({ id:'', content:m, source:'ombre', createdAt:new Date() }))]
       const allMsgs = [...conv.messages, userMsg]
       let acc = ''
-      await sendMessage(allMsgs, allMemories, conv.aiName, chunk => {
-        acc += chunk; store.updateLastMessage(conv.id, acc)
-      })
-      extractMemories(t, acc).then((facts: string[]) => {
-        facts.forEach((f: string) => { store.addMemory(f, conv.id); saveMemory(f) })
-      })
+      await sendMessage(allMsgs, allMems, conv.aiName, chunk => { acc += chunk; store.updateLastMessage(conv.id, acc) })
+      extractMemories(t, acc).then((facts: string[]) => facts.forEach((f: string) => { store.addMemory(f, conv.id); saveMemory(f) }))
+      aiAutonomousAction(t, acc)
     } catch (e: any) { store.updateLastMessage(conv.id, `❌ ${e.message}`) }
     setLoading(false)
   }
@@ -70,65 +91,44 @@ export default function ChatScreen({ store, onBack, onViewProfile }: Props) {
 
   const handleImageFile = (file: File) => {
     const reader = new FileReader()
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string
-      const imgMsg: Message = { id: Date.now().toString(), role: 'user', content: `[图片]\n${dataUrl}`, timestamp: new Date() }
-      store.addMessage(conv.id, imgMsg)
-    }
+    reader.onload = e => store.addMessage(conv.id, { id: Date.now().toString(), role: 'user', content: `[图片]\n${e.target?.result}`, timestamp: new Date() })
     reader.readAsDataURL(file)
   }
 
   const handleAiPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      store.updateConvSettings(conv.id, ev.target?.result as string, conv.aiName)
-    }
-    reader.readAsDataURL(file)
+    const file = e.target.files?.[0]; if (!file) return
+    const r = new FileReader()
+    r.onload = ev => store.updateConvSettings(conv.id, ev.target?.result as string, conv.aiName)
+    r.readAsDataURL(file)
   }
 
-  const setBg = (v: string) => { setChatBg(v); localStorage.setItem('chatBg', v) }
-
-  const bgClass = chatBg ? `chat-bg-${chatBg}` : ''
-
-  const isImgMsg = (content: string) => content.startsWith('[图片]\n')
-  const getImgSrc = (content: string) => content.slice(5).trim()
+  const isImgMsg = (c: string) => c.startsWith('[图片]\n')
+  const getImgSrc = (c: string) => c.slice(5).trim()
+  const msgs = conv?.messages || []
 
   return (
-    <div className={`chat-screen ${bgClass}`} onClick={() => { setShowEmoji(false); setShowToolbar(false) }}>
-      {/* hidden file inputs */}
-      <input ref={photoRef} type="file" accept="image/*" style={{ display:'none' }}
-        onChange={e => e.target.files?.[0] && handleImageFile(e.target.files[0])} />
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display:'none' }}
-        onChange={e => e.target.files?.[0] && handleImageFile(e.target.files[0])} />
+    <div className="wechat-chat" onClick={() => { setShowEmoji(false); setShowToolbar(false) }}>
+      <input ref={photoRef} type="file" accept="image/*" style={{ display:'none' }} onChange={e => e.target.files?.[0] && handleImageFile(e.target.files[0])} />
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display:'none' }} onChange={e => e.target.files?.[0] && handleImageFile(e.target.files[0])} />
       <input ref={aiPhotoRef} type="file" accept="image/*" style={{ display:'none' }} onChange={handleAiPhoto} />
 
       {/* TOPBAR */}
-      <div className="topbar" onClick={e => e.stopPropagation()}>
-        <button className="back-btn" onClick={onBack}><ArrowLeft size={22} /></button>
-        <button className="avatar-btn" onClick={() => setShowAvatarPicker(p => !p)}>
-          {conv?.aiAvatar?.startsWith('data:')
-            ? <img src={conv.aiAvatar} className="chat-avatar-img" alt="avatar" />
-            : <span className="chat-avatar-emoji">{conv?.aiAvatar}</span>}
-        </button>
-        <div className="topbar-info">
-          <div className="topbar-name">{conv?.aiName}</div>
-          <div className="topbar-sub">在线 · 点击头像换形象</div>
+      <div className="wc-topbar" onClick={e => e.stopPropagation()}>
+        <button className="wc-back" onClick={onBack}><ArrowLeft size={20} /></button>
+        <div className="wc-topbar-center">
+          <button className="wc-name-btn" onClick={() => setShowAvatarPicker(p => !p)}>
+            {conv?.aiName}
+          </button>
+          <div className="wc-status">在线</div>
         </div>
-        <button className="tool-icon" style={{ marginLeft:'auto' }} onClick={() => {
-          const next = BG_OPTIONS[(BG_OPTIONS.findIndex(b => b.value === chatBg) + 1) % BG_OPTIONS.length]
-          setBg(next.value)
-        }} title="换背景">
-          <Palette size={18} />
-        </button>
+        <button className="wc-more">···</button>
       </div>
 
       {/* AVATAR PICKER */}
       {showAvatarPicker && (
-        <div className="avatar-picker" onClick={e => e.stopPropagation()}>
+        <div className="wc-avatar-picker" onClick={e => e.stopPropagation()}>
           <div className="ap-section">
-            <div className="ap-label">选择头像</div>
+            <div className="ap-label">AI 头像</div>
             <div className="ap-grid">
               {EMOJI_AVATARS.map(a => (
                 <button key={a} className={`ap-item ${conv?.aiAvatar === a ? 'selected' : ''}`}
@@ -149,7 +149,7 @@ export default function ChatScreen({ store, onBack, onViewProfile }: Props) {
         </div>
       )}
 
-      {/* GAME */}
+      {/* GAME MODAL */}
       {showGame && (
         <div className="game-modal" onClick={() => setShowGame(false)}>
           <div className="game-inner" onClick={e => e.stopPropagation()}>
@@ -160,84 +160,77 @@ export default function ChatScreen({ store, onBack, onViewProfile }: Props) {
       )}
 
       {/* MESSAGES */}
-      <div className="chat-messages" onClick={() => { setShowEmoji(false); setShowToolbar(false) }}>
-        {!conv?.messages?.length && (
-          <div className="empty-chat">
-            <div className="empty-chat-avatar">
-              {conv?.aiAvatar?.startsWith('data:')
-                ? <img src={conv.aiAvatar} style={{ width:64, height:64, borderRadius:16, objectFit:'cover' }} alt="" />
-                : <span style={{ fontSize:56 }}>{conv?.aiAvatar}</span>}
-            </div>
-            <p>你好呀，我是{conv?.aiName} ✨</p>
-            <p className="empty-sub">有什么想聊的？</p>
+      <div className="wc-messages">
+        {msgs.length === 0 && (
+          <div className="wc-empty">
+            <div style={{ fontSize:50 }}>{conv?.aiAvatar?.startsWith('data:') ? '🌸' : conv?.aiAvatar}</div>
+            <p>{conv?.aiName} 在这里</p>
+            <p className="empty-sub">说点什么吧～</p>
           </div>
         )}
-        {conv?.messages?.map((msg: Message) => (
-          <div key={msg.id} className={`msg-row ${msg.role}`}>
-            {/* AI: avatar LEFT, bubble RIGHT */}
-            {msg.role === 'assistant' && (
-              <div className="msg-av ai-av" onClick={onViewProfile} style={{ cursor:'pointer' }}>
-                {conv.aiAvatar?.startsWith('data:')
-                  ? <img src={conv.aiAvatar} style={{ width:34, height:34, borderRadius:10, objectFit:'cover' }} alt="" />
-                  : conv.aiAvatar}
+        {msgs.map((msg: Message, i: number) => {
+          const timeLabel = shouldShowTime(msgs, i)
+          return (
+            <div key={msg.id}>
+              {timeLabel && <div className="wc-time-label">{timeLabel}</div>}
+              <div className={`wc-msg-row ${msg.role}`}>
+                {msg.role === 'assistant' && (
+                  <div className="wc-av ai" onClick={onViewProfile}>
+                    {conv?.aiAvatar?.startsWith('data:')
+                      ? <img src={conv.aiAvatar} className="wc-av-img" alt="" />
+                      : conv?.aiAvatar}
+                  </div>
+                )}
+                <div className={`wc-bubble ${msg.role}`}>
+                  {isImgMsg(msg.content)
+                    ? <img src={getImgSrc(msg.content)} className="wc-chat-img" alt="" />
+                    : msg.content || (msg.role === 'assistant' && loading ? <span className="typing">···</span> : null)}
+                </div>
+                {msg.role === 'user' && (
+                  <div className="wc-av user">
+                    {store.userProfile?.avatar?.startsWith('data:')
+                      ? <img src={store.userProfile.avatar} className="wc-av-img" alt="" />
+                      : (store.userProfile?.avatar || '我')}
+                  </div>
+                )}
               </div>
-            )}
-            <div className={`msg-bubble ${msg.role === 'user' ? 'user-bubble-glass' : 'ai-bubble-glass'} ${isImgMsg(msg.content) ? 'img-bubble' : ''}`}>
-              {isImgMsg(msg.content)
-                ? <img src={getImgSrc(msg.content)} className="chat-img" alt="图片" />
-                : msg.content || (msg.role === 'assistant' && loading ? <span className="typing">···</span> : null)}
             </div>
-            {/* User: bubble LEFT, avatar RIGHT */}
-            {msg.role === 'user' && (
-              <div className="msg-av user-av">
-                {store.userProfile?.avatar?.startsWith('data:')
-                  ? <img src={store.userProfile.avatar} style={{ width:34, height:34, borderRadius:10, objectFit:'cover' }} alt="" />
-                  : (store.userProfile?.avatar || '我')}
-              </div>
-            )}
-          </div>
-        ))}
+          )
+        })}
         <div ref={bottomRef} />
       </div>
 
-      {/* INPUT */}
-      <div className="chat-input-wrap" onClick={e => e.stopPropagation()}>
-        {showEmoji && (
-          <div className="emoji-float">
-            <EmojiPicker onSelect={e => { setInput(p => p + e) }} />
-          </div>
-        )}
-
+      {/* INPUT BAR */}
+      <div className="wc-input-bar" onClick={e => e.stopPropagation()}>
+        {showEmoji && <div className="wc-emoji-panel"><EmojiPicker onSelect={e => setInput(p => p + e)} /></div>}
         {showToolbar && (
-          <div className="extra-toolbar">
-            <button className="extra-btn" onClick={() => { photoRef.current?.click(); setShowToolbar(false) }}>
-              <div className="extra-icon"><Image size={22} /></div><span>相册</span>
+          <div className="wc-extra-panel">
+            <button className="wc-extra-item" onClick={() => { photoRef.current?.click(); setShowToolbar(false) }}>
+              <div className="wc-extra-icon"><Image size={24} /></div><span>相册</span>
             </button>
-            <button className="extra-btn" onClick={() => { cameraRef.current?.click(); setShowToolbar(false) }}>
-              <div className="extra-icon"><Camera size={22} /></div><span>拍摄</span>
+            <button className="wc-extra-item" onClick={() => { cameraRef.current?.click(); setShowToolbar(false) }}>
+              <div className="wc-extra-icon"><Camera size={24} /></div><span>拍摄</span>
             </button>
-            <button className="extra-btn" onClick={() => { setShowGame(true); setShowToolbar(false) }}>
-              <div className="extra-icon"><Gamepad2 size={22} /></div><span>游戏</span>
-            </button>
-            <button className="extra-btn" onClick={() => {
-              handleSend('给我讲个笑话或者说一句今天的暖心话 🌸')
-              setShowToolbar(false)
-            }}>
-              <div className="extra-icon">💌</div><span>随机惊喜</span>
+            <button className="wc-extra-item" onClick={() => { setShowGame(true); setShowToolbar(false) }}>
+              <div className="wc-extra-icon"><Gamepad2 size={24} /></div><span>游戏</span>
             </button>
           </div>
         )}
-
-        <div className="input-row">
-          <button className="tool-icon" onClick={() => { setShowEmoji(p => !p); setShowToolbar(false) }}>
-            <Smile size={22} />
+        <div className="wc-input-row">
+          <button className="wc-voice-btn" onClick={() => setVoiceMode(v => !v)}>
+            <Mic size={22} color={voiceMode ? '#07c160' : '#888'} />
           </button>
-          <textarea ref={taRef} className="msg-input" value={input} onChange={onInput} onKeyDown={onKey}
-            placeholder="说点什么..." rows={1} />
+          {voiceMode
+            ? <button className="wc-voice-hold">按住 说话</button>
+            : <textarea ref={taRef} className="wc-textarea" value={input} onChange={onInput} onKeyDown={onKey} placeholder="发消息" rows={1} />
+          }
+          <button className="wc-emoji-btn" onClick={() => { setShowEmoji(p => !p); setShowToolbar(false) }}>
+            <Smile size={22} color="#888" />
+          </button>
           {input.trim()
-            ? <button className="send-btn" onClick={() => handleSend()} disabled={loading}><Send size={18} /></button>
-            : <button className="tool-icon plus-btn" onClick={() => { setShowToolbar(p => !p); setShowEmoji(false) }}>
-                <Plus size={22} />
+            ? <button className="wc-send-btn" onClick={() => handleSend()}>发送</button>
+            : <button className="wc-plus-btn" onClick={() => { setShowToolbar(p => !p); setShowEmoji(false) }}>
+                <Plus size={22} color="#888" />
               </button>
           }
         </div>

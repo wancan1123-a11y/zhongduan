@@ -110,6 +110,20 @@ export async function generateAiDiary(memories: Memory[], date: string): Promise
   return d.choices?.[0]?.message?.content || ''
 }
 
+export async function generateAiComment(momentText: string, aiName: string): Promise<string> {
+  const res = await fetch(`${BASE_URL}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getKey()}` },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [{ role: 'user', content: `你叫${aiName}，看到好友发的朋友圈："${momentText}"，写一条简短自然的评论，15字以内，像朋友一样。` }],
+      max_tokens: 60,
+    }),
+  })
+  const d = await res.json()
+  return d.choices?.[0]?.message?.content || '好棒！'
+}
+
 export async function generateMoment(_memories: Memory[], aiName: string): Promise<string> {
   const res = await fetch(`${BASE_URL}/chat/completions`, {
     method: 'POST',

@@ -1,14 +1,14 @@
 import { useState, useRef } from 'react'
-import { ArrowLeft, Heart, MessageCircle, Plus, RefreshCw, Camera } from 'lucide-react'
+import { ArrowLeft, Heart, MessageCircle, Plus, Camera } from 'lucide-react'
 import type { Moment } from '../types'
-import { generateMoment } from '../api/deepseek'
+// generateMoment used for AI autonomous posting via chat trigger
 
 interface Props { store: any; onBack: () => void }
 
 export default function MomentsScreen({ store, onBack }: Props) {
   const [commenting, setCommenting] = useState<string | null>(null)
   const [commentText, setCommentText] = useState('')
-  const [aiLoading, setAiLoading] = useState(false)
+  const [_aiLoading, _setAiLoading] = useState(false)
   const [posting, setPosting] = useState(false)
   const [myText, setMyText] = useState('')
   const [myImages, setMyImages] = useState<string[]>([])
@@ -18,19 +18,22 @@ export default function MomentsScreen({ store, onBack }: Props) {
   const conv = store.currentConversation
   const profile = store.userProfile
 
-  const genAiPost = async () => {
-    setAiLoading(true)
-    try {
-      const text = await generateMoment(store.memories, conv?.aiName || 'AI')
-      store.addMoment({ id: Date.now().toString(), content: text, images: [], author: 'ai', likes: 0, liked: false, comments: [], createdAt: new Date() })
-    } catch {}
-    setAiLoading(false)
-  }
 
   const postMine = () => {
     if (!myText.trim() && myImages.length === 0) return
-    store.addMoment({ id: Date.now().toString(), content: myText.trim(), images: myImages, author: 'user', likes: 0, liked: false, comments: [], createdAt: new Date() })
+    const newMoment = { id: Date.now().toString(), content: myText.trim(), images: myImages, author: 'user' as const, likes: 0, liked: false, comments: [], createdAt: new Date() }
+    store.addMoment(newMoment)
     setMyText(''); setMyImages([]); setPosting(false)
+    // AI 有 40% 概率自动评论
+    if (Math.random() < 0.4) {
+      setTimeout(async () => {
+        try {
+          const { generateAiComment } = await import('../api/deepseek')
+          const comment = await generateAiComment(myText.trim(), conv?.aiName || 'AI')
+          store.addComment(newMoment.id, comment)
+        } catch {}
+      }, 2000 + Math.random() * 4000)
+    }
   }
 
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -84,12 +87,11 @@ export default function MomentsScreen({ store, onBack }: Props) {
 
       {/* ACTION BAR */}
       <div className="moments-action-bar">
-        <button className="moments-action-btn" onClick={genAiPost} disabled={aiLoading}>
-          <RefreshCw size={16} className={aiLoading ? 'spin' : ''} />
-          <span>让 AI 发动态</span>
-        </button>
         <button className="moments-action-btn primary" onClick={() => setPosting(p => !p)}>
           <Plus size={16} /><span>发朋友圈</span>
+        </button>
+        <button className="moments-action-btn" style={{ opacity:0.5 }} onClick={() => {}} disabled>
+          <Camera size={16} /><span>拍一拍</span>
         </button>
       </div>
 

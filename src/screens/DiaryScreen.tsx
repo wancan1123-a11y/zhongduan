@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { ArrowLeft, Plus, ChevronLeft, ChevronRight, Sparkles, Bot } from 'lucide-react'
+import { ArrowLeft, Plus, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
 import type { DiaryEntry } from '../types'
-import { generateDiarySummary, generateAiDiary } from '../api/deepseek'
+import { generateDiarySummary } from '../api/deepseek'
 
 const MOODS = ['😊','😌','😔','😤','🥰','😴','🤔','😂']
 
@@ -17,7 +17,6 @@ export default function DiaryScreen({ store, onBack }: Props) {
   const [content, setContent] = useState('')
   const [mood, setMood] = useState('😊')
   const [aiLoading, setAiLoading] = useState(false)
-  const [aiWriting, setAiWriting] = useState(false)
 
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const firstDay = new Date(year, month, 1).getDay()
@@ -31,16 +30,6 @@ export default function DiaryScreen({ store, onBack }: Props) {
 
   const dateStr = (d: number) => `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
   const selectedEntry = selected ? diaryMap[selected] : null
-
-  const aiWriteDiary = async () => {
-    if (!selected) return
-    setAiWriting(true)
-    try {
-      const aiContent = await generateAiDiary(store.memories, selected)
-      store.addDiary({ id: Date.now().toString(), date: selected, content: aiContent, mood: '🤖', createdAt: new Date() })
-    } catch {}
-    setAiWriting(false)
-  }
 
   const save = () => {
     if (!content.trim() || !selected) return
@@ -66,12 +55,9 @@ export default function DiaryScreen({ store, onBack }: Props) {
           <button className={`diary-tab ${tab==='user'?'active':''}`} onClick={() => setTab('user')}>我的</button>
           <button className={`diary-tab ${tab==='ai'?'active':''}`} onClick={() => setTab('ai')}>AI 的</button>
         </div>
-        {tab === 'user'
-          ? <button className="icon-btn-primary" style={{ marginLeft:'auto' }} onClick={() => setWriting(true)}><Plus size={20} /></button>
-          : <button className="icon-btn-secondary" style={{ marginLeft:'auto' }} onClick={aiWriteDiary} disabled={!selected || aiWriting} title="让AI写今天的日记">
-              <Bot size={18} />
-            </button>
-        }
+        {tab === 'user' && (
+          <button className="icon-btn-primary" style={{ marginLeft:'auto' }} onClick={() => setWriting(true)}><Plus size={20} /></button>
+        )}
       </div>
 
       {/* CALENDAR */}
