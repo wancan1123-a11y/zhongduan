@@ -463,6 +463,8 @@ body {
 .chat-avatar-img { width:34px; height:34px; border-radius:10px; object-fit:cover; }
 .ap-upload { flex-direction:column; gap:2px; font-size:14px; }
 .ap-upload span { font-size:9px; color:var(--text3); }
+.ap-custom-input { margin-top:8px; width:100%; border:1.5px solid var(--border); border-radius:8px; padding:6px 10px; font-size:13px; outline:none; background:#fff; }
+.ap-custom-input:focus { border-color:var(--accent); }
 
 /* MSG ANIMATIONS */
 .msg-row { animation: fadeIn 0.25s ease; }

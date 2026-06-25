@@ -13,7 +13,7 @@ import { shouldSearch, tavilySearch, formatSearchContext } from '../api/search'
 import { getFullLocation } from '../api/location'
 
 const EMOJI_AVATARS = ['🌸','🌙','⭐','🦊','🐱','🌈','💫','🍀','🎀','🤖','🦋','🌺']
-const AI_NAMES = ['小语','晴晴','星星','小鹿','暖暖','云朵','小月','糖糖']
+const AI_NAMES = ['稳稳','小语','晴晴','星星','小鹿','暖暖','云朵','小月','糖糖']
 
 const BUBBLE_COLORS = [
   { label: '薄荷绿', value: 'rgba(149,236,105,0.55)' },
@@ -328,6 +328,12 @@ write_diary=true 表示你想写今天的日记`
                   onClick={() => store.updateConvSettings(conv.id, conv.aiAvatar, n)}>{n}</button>
               ))}
             </div>
+            <input className="ap-custom-input" placeholder="自定义名字..." maxLength={8}
+              onKeyDown={e => { if (e.key === 'Enter' && (e.target as HTMLInputElement).value.trim()) {
+                store.updateConvSettings(conv.id, conv.aiAvatar, (e.target as HTMLInputElement).value.trim())
+                setShowAvatarPicker(false)
+              }}}
+            />
           </div>
         </div>
       )}
