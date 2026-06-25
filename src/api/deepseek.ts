@@ -44,9 +44,14 @@ function buildSystem(ctx: AppContext): string {
     if (custom.aiStyle) base += `\n\n【回复风格要求】\n${custom.aiStyle}`
   }
 
-  // 记忆库
-  if (memories.length) {
-    base += `\n\n【你和用户之间的重要记忆（这些是你们真实经历过的，请自然融入对话）】\n${memories.slice(0, 10).map(m => `• ${m.content}`).join('\n')}`
+  // 记忆库（区分本地提取的事实 vs Ombre历史）
+  const localMems = memories.filter(m => m.source !== 'ombre').slice(0, 8)
+  const ombreMems = memories.filter(m => m.source === 'ombre').slice(0, 5)
+  if (localMems.length) {
+    base += `\n\n【你了解到关于用户的事实】\n${localMems.map(m => `• ${m.content}`).join('\n')}`
+  }
+  if (ombreMems.length) {
+    base += `\n\n【用户和你过去聊天记录中的片段（仅供参考，不要逐字复述）】\n${ombreMems.map(m => `• ${m.content.slice(0, 80)}`).join('\n')}`
   }
 
   // 最近日记（只看用户写的，非AI）
