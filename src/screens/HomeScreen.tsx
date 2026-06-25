@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Music, ChevronRight, RefreshCw } from 'lucide-react'
+import { ChevronRight, RefreshCw } from 'lucide-react'
 import type { Screen } from '../types'
 import { generateDailyCare } from '../api/deepseek'
 import MusicWidget from '../components/MusicWidget'
@@ -11,10 +11,7 @@ interface Props {
 
 function ClockWidget({ onClick }: { onClick: () => void }) {
   const [time, setTime] = useState(new Date())
-  useEffect(() => {
-    const t = setInterval(() => setTime(new Date()), 1000)
-    return () => clearInterval(t)
-  }, [])
+  useEffect(() => { const t = setInterval(() => setTime(new Date()), 1000); return () => clearInterval(t) }, [])
   const h = time.getHours().toString().padStart(2, '0')
   const m = time.getMinutes().toString().padStart(2, '0')
   const week = ['周日','周一','周二','周三','周四','周五','周六'][time.getDay()]
@@ -31,31 +28,27 @@ export default function HomeScreen({ store, onNavigate }: Props) {
   const [note, setNote] = useState<string>(store.aiNotes[0]?.content || '')
   const [noteLoading, setNoteLoading] = useState(false)
   const conv = store.currentConversation
+  const profile = store.userProfile
 
   const refreshNote = async () => {
     setNoteLoading(true)
     try {
       const n = await generateDailyCare(store.memories, conv?.aiName || 'AI')
-      setNote(n)
-      store.addAiNote(n)
+      setNote(n); store.addAiNote(n)
     } catch { setNote('今天也要好好照顾自己哦 🌸') }
     setNoteLoading(false)
   }
 
-  useEffect(() => {
-    if (!note && store.memories.length >= 0) refreshNote()
-  }, [])
+  useEffect(() => { if (!note) refreshNote() }, [])
 
-  // last diary entry
-  const lastDiary = store.diary[0]
+  const lastDiary = store.diary.filter((d: any) => d.mood !== '🤖')[0]
   const todayStr = new Date().toISOString().slice(0, 10)
-  const hasTodayDiary = store.diary.some((d: any) => d.date === todayStr)
-
-  const profile = store.userProfile
+  const hasTodayDiary = store.diary.some((d: any) => d.date === todayStr && d.mood !== '🤖')
+  const lastMoment = store.moments[0]
 
   return (
     <div className="home-screen">
-      {/* USER AVATAR TOP RIGHT */}
+      {/* TOP BAR */}
       <div className="home-topbar">
         <div className="home-greeting">终端</div>
         <button className="home-user-avatar" onClick={() => onNavigate('profile')}>
@@ -68,62 +61,59 @@ export default function HomeScreen({ store, onNavigate }: Props) {
       {/* CLOCK */}
       <ClockWidget onClick={() => onNavigate('clock')} />
 
-      {/* ROW: AI NOTE + MUSIC */}
+      {/* ROW 1: MUSIC + CHAT ENTRY */}
       <div className="home-row">
-        <div className="home-card note-card">
+        <div className="home-card square-card music-card">
           <div className="card-header">
-            <span className="card-label">
-              {conv?.aiAvatar} {conv?.aiName || 'AI'} 的叮嘱
-            </span>
-            <button className="refresh-btn" onClick={refreshNote} disabled={noteLoading}>
-              <RefreshCw size={13} className={noteLoading ? 'spin' : ''} />
-            </button>
-          </div>
-          <p className="note-text">
-            {noteLoading ? '生成中...' : (note || '点击刷新获取今日叮嘱 ✨')}
-          </p>
-        </div>
-
-        <div className="home-card music-card">
-          <div className="card-header">
-            <span className="card-label"><Music size={12} /> 音乐</span>
+            <span className="card-label">🎵 音乐</span>
           </div>
           <MusicWidget tracks={store.tracks} />
         </div>
-      </div>
 
-      {/* CHAT ENTRY */}
-      <div className="home-card chat-entry" onClick={() => onNavigate('chat')}>
-        <div className="entry-avatar">{conv?.aiAvatar || '🤖'}</div>
-        <div className="entry-info">
-          <div className="entry-name">{conv?.aiName || 'AI 助手'}</div>
-          <div className="entry-preview">
-            {conv?.messages[conv.messages.length - 1]?.content?.slice(0, 28) || '点击开始对话...'}
+        <div className="home-card square-card chat-square" onClick={() => onNavigate('chat')}>
+          <div className="chat-square-avatar">
+            {conv?.aiAvatar?.startsWith('data:')
+              ? <img src={conv.aiAvatar} alt="" className="chat-sq-img" />
+              : <span>{conv?.aiAvatar || '🌸'}</span>}
+          </div>
+          <div className="chat-square-name">{conv?.aiName || 'AI 助手'}</div>
+          <div className="chat-square-preview">
+            {conv?.messages[conv.messages.length - 1]?.content?.slice(0, 20) || '点击开始聊天...'}
           </div>
         </div>
-        <ChevronRight size={16} color="#aaa" />
       </div>
 
-      {/* DIARY ENTRY */}
+      {/* DIARY FULL WIDTH */}
       <div className="home-card diary-entry" onClick={() => onNavigate('diary')}>
         <div className="entry-info">
           <div className="entry-name">📅 日记本</div>
           <div className="entry-preview">
-            {hasTodayDiary ? '今天已记录 ✓' : lastDiary ? `上次：${lastDiary.date}` : '还没有日记，点击记录今天'}
+            {hasTodayDiary ? '今天已记录 ✓' : lastDiary ? `上次：${lastDiary.date}` : '点击记录今天的心情'}
           </div>
         </div>
         <ChevronRight size={16} color="#aaa" />
       </div>
 
-      {/* MOMENTS ENTRY */}
-      <div className="home-card moments-entry" onClick={() => onNavigate('moments')}>
-        <div className="entry-info">
-          <div className="entry-name">🌸 朋友圈</div>
-          <div className="entry-preview">
-            {store.moments[0]?.content?.slice(0, 28) || '查看 AI 的朋友圈动态...'}
+      {/* ROW 2: 叮嘱 + 朋友圈 */}
+      <div className="home-row">
+        <div className="home-card square-card note-card">
+          <div className="card-header">
+            <span className="card-label">{conv?.aiAvatar} 叮嘱</span>
+            <button className="refresh-btn" onClick={e => { e.stopPropagation(); refreshNote() }} disabled={noteLoading}>
+              <RefreshCw size={13} className={noteLoading ? 'spin' : ''} />
+            </button>
           </div>
+          <p className="note-text">{noteLoading ? '生成中...' : (note || '点击刷新 ✨')}</p>
         </div>
-        <ChevronRight size={16} color="#aaa" />
+
+        <div className="home-card square-card moments-square" onClick={() => onNavigate('moments')}>
+          <div className="card-header">
+            <span className="card-label">🌸 朋友圈</span>
+          </div>
+          <p className="note-text">
+            {lastMoment?.content?.slice(0, 40) || 'AI 还没发朋友圈，点击查看'}
+          </p>
+        </div>
       </div>
     </div>
   )

@@ -174,6 +174,7 @@ export default function ChatScreen({ store, onBack, onViewProfile }: Props) {
         )}
         {conv?.messages?.map((msg: Message) => (
           <div key={msg.id} className={`msg-row ${msg.role}`}>
+            {/* AI: avatar LEFT, bubble RIGHT */}
             {msg.role === 'assistant' && (
               <div className="msg-av ai-av" onClick={onViewProfile} style={{ cursor:'pointer' }}>
                 {conv.aiAvatar?.startsWith('data:')
@@ -181,6 +182,12 @@ export default function ChatScreen({ store, onBack, onViewProfile }: Props) {
                   : conv.aiAvatar}
               </div>
             )}
+            <div className={`msg-bubble ${msg.role === 'user' ? 'user-bubble-glass' : 'ai-bubble-glass'} ${isImgMsg(msg.content) ? 'img-bubble' : ''}`}>
+              {isImgMsg(msg.content)
+                ? <img src={getImgSrc(msg.content)} className="chat-img" alt="图片" />
+                : msg.content || (msg.role === 'assistant' && loading ? <span className="typing">···</span> : null)}
+            </div>
+            {/* User: bubble LEFT, avatar RIGHT */}
             {msg.role === 'user' && (
               <div className="msg-av user-av">
                 {store.userProfile?.avatar?.startsWith('data:')
@@ -188,11 +195,6 @@ export default function ChatScreen({ store, onBack, onViewProfile }: Props) {
                   : (store.userProfile?.avatar || '我')}
               </div>
             )}
-            <div className={`msg-bubble ${msg.role === 'user' ? 'user-bubble-glass' : 'ai-bubble-glass'} ${isImgMsg(msg.content) ? 'img-bubble' : ''}`}>
-              {isImgMsg(msg.content)
-                ? <img src={getImgSrc(msg.content)} className="chat-img" alt="图片" />
-                : msg.content || (msg.role === 'assistant' && loading ? <span className="typing">···</span> : null)}
-            </div>
           </div>
         ))}
         <div ref={bottomRef} />

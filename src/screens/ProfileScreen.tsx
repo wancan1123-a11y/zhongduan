@@ -69,7 +69,9 @@ export default function ProfileScreen({ isAi, aiName, aiAvatar, userProfile, onU
 
       {/* HEADER COVER */}
       <div className="profile-cover">
-        <button className="back-btn-light" onClick={onBack}><ArrowLeft size={22} /></button>
+        <button className="back-btn-light" onClick={onBack} style={{ zIndex:10, position:'absolute', top:14, left:14 }}>
+          <ArrowLeft size={22} />
+        </button>
         <div className="profile-cover-blur" />
       </div>
 
