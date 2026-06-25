@@ -95,6 +95,21 @@ export async function generateDiarySummary(content: string): Promise<string> {
   return d.choices?.[0]?.message?.content || ''
 }
 
+export async function generateAiDiary(memories: Memory[], date: string): Promise<string> {
+  const memStr = memories.slice(0, 10).map(m => m.content).join('；') || '暂无记录'
+  const res = await fetch(`${BASE_URL}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getKey()}` },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [{ role: 'user', content: `你是用户的AI伴侣，根据你了解到的关于用户的信息（${memStr}），以用户的视角为${date}写一篇温柔的日记，200字以内，真实自然。` }],
+      max_tokens: 300,
+    }),
+  })
+  const d = await res.json()
+  return d.choices?.[0]?.message?.content || ''
+}
+
 export async function generateMoment(_memories: Memory[], aiName: string): Promise<string> {
   const res = await fetch(`${BASE_URL}/chat/completions`, {
     method: 'POST',

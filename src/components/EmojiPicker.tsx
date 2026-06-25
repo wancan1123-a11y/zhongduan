@@ -1,10 +1,9 @@
-const EMOJIS = [
-  '😀','😂','🥰','😍','🤩','😎','🥳','😊','🙂','😉',
-  '😅','🤣','😭','😢','😤','😡','🤔','🤗','😴','🤯',
-  '👍','👎','👏','🙌','🤝','❤️','🔥','✨','🎉','🎊',
-  '🌟','💯','🙏','💪','👀','🫡','🫶','💀','😈','👻',
-  '🐶','🐱','🐼','🐸','🦊','🐯','🦁','🐮','🐷','🐧',
-  '🍎','🍕','🍔','🍜','🍣','🍰','🎂','☕','🧋','🍺',
+const EMOJI_GROUPS = [
+  { label: '常用', emojis: ['😊','😂','🥰','😍','🤩','😎','🥳','😉','😅','🤣','😭','😢','😤','😡','🤔','🤗','😴','🤯','😈','👻'] },
+  { label: '手势', emojis: ['👍','👎','👏','🙌','🤝','🙏','💪','👀','🫡','🫶','✌️','🤞','👌','🤙','👋','🫂','❤️','🔥','✨','💯'] },
+  { label: '动物', emojis: ['🐶','🐱','🐼','🐸','🦊','🐯','🦁','🐮','🐷','🐧','🦋','🌸','🌹','🍀','🌙','⭐','🌈','☁️','🌊','🍃'] },
+  { label: '食物', emojis: ['🍎','🍕','🍔','🍜','🍣','🍰','🎂','☕','🧋','🍺','🍓','🍑','🥑','🍩','🍦','🧁','🥐','🍫','🍬','🍭'] },
+  { label: '活动', emojis: ['🎉','🎊','🎈','🎁','🎵','🎶','🎮','🎯','🏆','🥇','💃','🕺','🎭','🎨','📸','💌','📱','💻','🎒','✈️'] },
 ]
 
 interface Props {
@@ -13,35 +12,19 @@ interface Props {
 
 export default function EmojiPicker({ onSelect }: Props) {
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(10, 1fr)',
-      gap: '4px',
-      padding: '12px',
-      background: '#fff',
-      borderRadius: '12px',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-      width: '320px',
-    }}>
-      {EMOJIS.map((e) => (
-        <button
-          key={e}
-          onClick={() => onSelect(e)}
-          style={{
-            background: 'none',
-            border: 'none',
-            fontSize: '22px',
-            cursor: 'pointer',
-            padding: '4px',
-            borderRadius: '6px',
-            lineHeight: 1,
-          }}
-          onMouseEnter={(ev) => (ev.currentTarget.style.background = '#f0f0f0')}
-          onMouseLeave={(ev) => (ev.currentTarget.style.background = 'none')}
-        >
-          {e}
-        </button>
-      ))}
+    <div className="emoji-picker-wrap">
+      <div className="emoji-scroll">
+        {EMOJI_GROUPS.map(group => (
+          <div key={group.label} className="emoji-group">
+            <div className="emoji-group-label">{group.label}</div>
+            <div className="emoji-grid">
+              {group.emojis.map(e => (
+                <button key={e} className="emoji-btn" onClick={() => onSelect(e)}>{e}</button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
