@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import type { Conversation, Message, DiaryEntry, Memory, Moment, MusicTrack, AiNote, CustomInstruction } from '../types'
+import type { LocationInfo } from '../api/location'
 
 export interface UserProfile {
   avatar: string
@@ -63,6 +64,9 @@ export function useStore() {
     try { return JSON.parse(localStorage.getItem('t_custom') || 'null') || { aboutMe: '', aiStyle: '', enabled: false } } catch { return { aboutMe: '', aiStyle: '', enabled: false } }
   })
   const [useReasoner, setUseReasonerState] = useState<boolean>(() => localStorage.getItem('t_reasoner') === 'true')
+  const [location, setLocationState] = useState<LocationInfo | null>(() => {
+    try { return JSON.parse(localStorage.getItem('t_location') || 'null') } catch { return null }
+  })
 
   const currentConversation = conversations.find(c => c.id === currentConvId) || conversations[0]
 
@@ -144,12 +148,17 @@ export function useStore() {
     setUseReasonerState(v); localStorage.setItem('t_reasoner', String(v))
   }, [])
 
+  const setLocation = useCallback((loc: LocationInfo | null) => {
+    setLocationState(loc)
+    localStorage.setItem('t_location', JSON.stringify(loc))
+  }, [])
+
 
   return {
     conversations, currentConvId, currentConversation,
     diary, memories, moments, tracks, aiNotes, userProfile,
-    customInstruction, useReasoner,
-    updateUserProfile, updateCustomInstruction, setUseReasoner,
+    customInstruction, useReasoner, location,
+    updateUserProfile, updateCustomInstruction, setUseReasoner, setLocation,
     setCurrentConvId, addMessage, updateLastMessage, updateConvSettings,
     addMemory, deleteMemory, addDiary, updateDiary,
     addMoment, toggleLike, addComment, addTrack, addAiNote,

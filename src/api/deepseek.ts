@@ -1,11 +1,21 @@
 import type { Message, Memory, CustomInstruction } from '../types'
+import type { LocationInfo } from './location'
 
 const BASE_URL = 'https://api.deepseek.com/v1'
 const getKey = () => import.meta.env.VITE_DEEPSEEK_API_KEY || ''
 
-function buildSystem(memories: Memory[], aiName: string, custom?: CustomInstruction): string {
+function buildSystem(memories: Memory[], aiName: string, custom?: CustomInstruction, location?: LocationInfo | null): string {
+  const now = new Date()
+  const timeStr = `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 ${['周日','周一','周二','周三','周四','周五','周六'][now.getDay()]} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`
+
   let base = `你叫${aiName}，是用户温柔贴心的 AI 伴侣。你有自己的个性：温暖、体贴、偶尔俏皮。
-你记得用户告诉你的事情，会自然地在对话中提及。回复亲切自然，像真正了解用户的朋友。`
+你记得用户告诉你的事情，会自然地在对话中提及。回复亲切自然，像真正了解用户的朋友。
+当前时间：${timeStr}`
+
+  if (location) {
+    base += `\n用户位置：${location.region}${location.city}`
+    if (location.weather) base += `，当前天气：${location.weather}`
+  }
 
   if (custom?.enabled) {
     if (custom.aboutMe) base += `\n\n【关于用户】\n${custom.aboutMe}`
@@ -23,7 +33,8 @@ export async function sendMessage(
   onChunk: (t: string) => void,
   onThinking: (t: string) => void,
   useReasoner: boolean,
-  custom?: CustomInstruction
+  custom?: CustomInstruction,
+  location?: LocationInfo | null
 ): Promise<string> {
   const model = useReasoner ? 'deepseek-reasoner' : 'deepseek-chat'
   const res = await fetch(`${BASE_URL}/chat/completions`, {
@@ -32,7 +43,7 @@ export async function sendMessage(
     body: JSON.stringify({
       model,
       messages: [
-        { role: 'system', content: buildSystem(memories, aiName, custom) },
+        { role: 'system', content: buildSystem(memories, aiName, custom, location) },
         ...messages.map(m => ({ role: m.role, content: m.content })),
       ],
       stream: true,

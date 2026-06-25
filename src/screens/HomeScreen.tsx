@@ -61,6 +61,14 @@ export default function HomeScreen({ store, onNavigate }: Props) {
       {/* CLOCK */}
       <ClockWidget onClick={() => onNavigate('clock')} />
 
+      {/* WEATHER BAR */}
+      {store.location && (
+        <div className="weather-bar">
+          <span>{store.location.city}</span>
+          {store.location.weather && <span className="weather-val">{store.location.weather}</span>}
+        </div>
+      )}
+
       {/* ROW 1: MUSIC + CHAT ENTRY */}
       <div className="home-row">
         <div className="home-card square-card music-card">

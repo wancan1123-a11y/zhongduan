@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { ArrowLeft, Smile, Plus, Image, Camera, Gamepad2, Mic, Settings2 } from 'lucide-react'
+import { ArrowLeft, Smile, Plus, Image, Camera, Gamepad2, Mic, Settings2, MapPin } from 'lucide-react'
 import type { Message } from '../types'
 import { sendMessage, extractMemories, generateMoment, generateAiDiary } from '../api/deepseek'
 import { retrieveMemories, saveMemory } from '../api/memory'
@@ -7,6 +7,7 @@ import EmojiPicker from '../components/EmojiPicker'
 import TicTacToe from '../components/TicTacToe'
 import ThinkingBubble from '../components/ThinkingBubble'
 import { shouldSearch, tavilySearch, formatSearchContext } from '../api/search'
+import { getFullLocation } from '../api/location'
 
 const EMOJI_AVATARS = ['🌸','🌙','⭐','🦊','🐱','🌈','💫','🍀','🎀','🤖','🦋','🌺']
 const AI_NAMES = ['小语','晴晴','星星','小鹿','暖暖','云朵','小月','糖糖']
@@ -46,6 +47,7 @@ export default function ChatScreen({ store, onBack, onViewProfile, onCustomInstr
   const [bubbleColor, setBubbleColor] = useState(() => localStorage.getItem('bubbleColor') || 'rgba(149,236,105,0.55)')
   const [thinkingMap, setThinkingMap] = useState<Record<string, string>>({})
   const [searchStatus, setSearchStatus] = useState<string>('')
+  const [locLoading, setLocLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
   const photoRef = useRef<HTMLInputElement>(null)
@@ -145,7 +147,8 @@ write_diary=true 表示你想写今天的日记`
           setThinkingMap(prev => ({ ...prev, [asstMsg.id]: thinkAcc }))
         },
         store.useReasoner,
-        store.customInstruction
+        store.customInstruction,
+        store.location
       )
       setSearchStatus('')
       extractMemories(t, acc).then((facts: string[]) => facts.forEach((f: string) => { store.addMemory(f, conv.id); saveMemory(f) }))
@@ -196,6 +199,16 @@ write_diary=true 表示你想写今天的日记`
         </div>
         <button className="wc-color-dot" onClick={e => { e.stopPropagation(); setShowColorPicker(p => !p) }}
           style={{ background: bubbleColor, border:'2px solid rgba(255,255,255,0.8)' }} title="气泡颜色" />
+        <button className="wc-loc-btn" title={store.location ? `${store.location.city} ${store.location.weather || ''}` : '获取位置'}
+          onClick={async () => {
+            setLocLoading(true)
+            const loc = await getFullLocation()
+            if (loc) store.setLocation(loc)
+            setLocLoading(false)
+          }}>
+          <MapPin size={17} color={store.location ? '#07c160' : '#888'} className={locLoading ? 'spin-slow' : ''} />
+          {store.location && <span className="wc-loc-text">{store.location.city}</span>}
+        </button>
         <button className="wc-ci-btn" onClick={() => onCustomInstruction?.()} title="自定义指令">
           <Settings2 size={18} color={store.customInstruction?.enabled ? '#7b68ee' : '#888'} />
         </button>
