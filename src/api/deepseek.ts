@@ -1,26 +1,38 @@
-import type { Message, Memory } from '../types'
+import type { Message, Memory, CustomInstruction } from '../types'
 
 const BASE_URL = 'https://api.deepseek.com/v1'
 const getKey = () => import.meta.env.VITE_DEEPSEEK_API_KEY || ''
 
-function buildSystem(memories: Memory[], aiName: string): string {
-  const base = `你叫${aiName}，是用户温柔贴心的 AI 伴侣。你有自己的个性：温暖、体贴、偶尔俏皮。
+function buildSystem(memories: Memory[], aiName: string, custom?: CustomInstruction): string {
+  let base = `你叫${aiName}，是用户温柔贴心的 AI 伴侣。你有自己的个性：温暖、体贴、偶尔俏皮。
 你记得用户告诉你的事情，会自然地在对话中提及。回复亲切自然，像真正了解用户的朋友。`
-  if (!memories.length) return base
-  return `${base}\n\n【你记得关于用户的事】\n${memories.slice(0, 15).map(m => `- ${m.content}`).join('\n')}`
+
+  if (custom?.enabled) {
+    if (custom.aboutMe) base += `\n\n【关于用户】\n${custom.aboutMe}`
+    if (custom.aiStyle) base += `\n\n【回复风格要求】\n${custom.aiStyle}`
+  }
+
+  if (memories.length) {
+    base += `\n\n【你记得关于用户的事】\n${memories.slice(0, 15).map(m => `- ${m.content}`).join('\n')}`
+  }
+  return base
 }
 
 export async function sendMessage(
   messages: Message[], memories: Memory[], aiName: string,
-  onChunk: (t: string) => void
+  onChunk: (t: string) => void,
+  onThinking: (t: string) => void,
+  useReasoner: boolean,
+  custom?: CustomInstruction
 ): Promise<string> {
+  const model = useReasoner ? 'deepseek-reasoner' : 'deepseek-chat'
   const res = await fetch(`${BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getKey()}` },
     body: JSON.stringify({
-      model: 'deepseek-chat',
+      model,
       messages: [
-        { role: 'system', content: buildSystem(memories, aiName) },
+        { role: 'system', content: buildSystem(memories, aiName, custom) },
         ...messages.map(m => ({ role: m.role, content: m.content })),
       ],
       stream: true,
@@ -39,7 +51,11 @@ export async function sendMessage(
     for (const line of dec.decode(value).split('\n').filter(l => l.startsWith('data: '))) {
       const d = line.slice(6)
       if (d === '[DONE]') continue
-      try { const t = JSON.parse(d).choices?.[0]?.delta?.content || ''; if (t) { full += t; onChunk(t) } } catch {}
+      try {
+        const delta = JSON.parse(d).choices?.[0]?.delta || {}
+        if (delta.reasoning_content) onThinking(delta.reasoning_content)
+        if (delta.content) { full += delta.content; onChunk(delta.content) }
+      } catch {}
     }
   }
   return full

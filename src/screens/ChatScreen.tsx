@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
-import { ArrowLeft, Smile, Plus, Image, Camera, Gamepad2, Mic } from 'lucide-react'
+import { ArrowLeft, Smile, Plus, Image, Camera, Gamepad2, Mic, Settings2 } from 'lucide-react'
 import type { Message } from '../types'
 import { sendMessage, extractMemories, generateMoment, generateAiDiary } from '../api/deepseek'
 import { retrieveMemories, saveMemory } from '../api/memory'
 import EmojiPicker from '../components/EmojiPicker'
 import TicTacToe from '../components/TicTacToe'
+import ThinkingBubble from '../components/ThinkingBubble'
 
 const EMOJI_AVATARS = ['🌸','🌙','⭐','🦊','🐱','🌈','💫','🍀','🎀','🤖','🦋','🌺']
 const AI_NAMES = ['小语','晴晴','星星','小鹿','暖暖','云朵','小月','糖糖']
@@ -20,7 +21,7 @@ const BUBBLE_COLORS = [
   { label: '烟灰色', value: 'rgba(180,180,195,0.55)' },
 ]
 
-interface Props { store: any; onBack: () => void; onViewProfile?: () => void }
+interface Props { store: any; onBack: () => void; onViewProfile?: () => void; onCustomInstruction?: () => void }
 
 function shouldShowTime(msgs: Message[], idx: number): string {
   const d = new Date(msgs[idx].timestamp)
@@ -32,7 +33,7 @@ function shouldShowTime(msgs: Message[], idx: number): string {
   return ''
 }
 
-export default function ChatScreen({ store, onBack, onViewProfile }: Props) {
+export default function ChatScreen({ store, onBack, onViewProfile, onCustomInstruction }: Props) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [showEmoji, setShowEmoji] = useState(false)
@@ -42,6 +43,7 @@ export default function ChatScreen({ store, onBack, onViewProfile }: Props) {
   const [voiceMode, setVoiceMode] = useState(false)
   const [showColorPicker, setShowColorPicker] = useState(false)
   const [bubbleColor, setBubbleColor] = useState(() => localStorage.getItem('bubbleColor') || 'rgba(149,236,105,0.55)')
+  const [thinkingMap, setThinkingMap] = useState<Record<string, string>>({})
   const bottomRef = useRef<HTMLDivElement>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
   const photoRef = useRef<HTMLInputElement>(null)
@@ -109,7 +111,17 @@ write_diary=true 表示你想写今天的日记`
       const allMems = [...store.memories, ...ombreMemories.map((m: string) => ({ id:'', content:m, source:'ombre', createdAt:new Date() }))]
       const allMsgs = [...conv.messages, userMsg]
       let acc = ''
-      await sendMessage(allMsgs, allMems, conv.aiName, chunk => { acc += chunk; store.updateLastMessage(conv.id, acc) })
+      let thinkAcc = ''
+      await sendMessage(
+        allMsgs, allMems, conv.aiName,
+        chunk => { acc += chunk; store.updateLastMessage(conv.id, acc) },
+        thinkChunk => {
+          thinkAcc += thinkChunk
+          setThinkingMap(prev => ({ ...prev, [asstMsg.id]: thinkAcc }))
+        },
+        store.useReasoner,
+        store.customInstruction
+      )
       extractMemories(t, acc).then((facts: string[]) => facts.forEach((f: string) => { store.addMemory(f, conv.id); saveMemory(f) }))
       aiAutonomousAction(t, acc) // non-blocking
     } catch (e: any) { store.updateLastMessage(conv.id, `❌ ${e.message}`) }
@@ -158,6 +170,9 @@ write_diary=true 表示你想写今天的日记`
         </div>
         <button className="wc-color-dot" onClick={e => { e.stopPropagation(); setShowColorPicker(p => !p) }}
           style={{ background: bubbleColor, border:'2px solid rgba(255,255,255,0.8)' }} title="气泡颜色" />
+        <button className="wc-ci-btn" onClick={() => onCustomInstruction?.()} title="自定义指令">
+          <Settings2 size={18} color={store.customInstruction?.enabled ? '#7b68ee' : '#888'} />
+        </button>
         <button className="wc-more">···</button>
       </div>
 
@@ -226,6 +241,16 @@ write_diary=true 表示你想写今天的日记`
           return (
             <div key={msg.id}>
               {timeLabel && <div className="wc-time-label">{timeLabel}</div>}
+              {/* Thinking bubble row (above AI bubble) */}
+              {msg.role === 'assistant' && (thinkingMap[msg.id] || (loading && !msg.content && store.useReasoner)) && (
+                <div className="wc-thinking-row">
+                  <div style={{ width:38, flexShrink:0 }} />
+                  <ThinkingBubble
+                    thinking={thinkingMap[msg.id] || ''}
+                    isStreaming={loading && !msg.content}
+                  />
+                </div>
+              )}
               <div className={`wc-msg-row ${msg.role}`}>
                 {/* AI: avatar first then bubble (normal order) */}
                 {msg.role === 'assistant' && (

@@ -8,6 +8,7 @@ import MomentsScreen from './screens/MomentsScreen'
 import SettingsScreen from './screens/SettingsScreen'
 import MemoryScreen from './screens/MemoryScreen'
 import ProfileScreen from './screens/ProfileScreen'
+import CustomInstructionScreen from './screens/CustomInstructionScreen'
 import BottomNav from './components/BottomNav'
 import type { Screen } from './types'
 import './App.css'
@@ -24,11 +25,20 @@ export default function App() {
       <div className="screen-wrap">
         {screen === 'home' && <HomeScreen store={store} onNavigate={go} />}
         {screen === 'clock' && <ClockScreen onBack={() => go('home')} />}
-        {screen === 'chat' && <ChatScreen store={store} onBack={() => go('home')} onViewProfile={() => go('ai-profile')} />}
+        {screen === 'chat' && <ChatScreen store={store} onBack={() => go('home')} onViewProfile={() => go('ai-profile')} onCustomInstruction={() => go('custom-instruction')} />}
         {screen === 'diary' && <DiaryScreen store={store} onBack={() => go('home')} />}
         {screen === 'moments' && <MomentsScreen store={store} onBack={() => go('home')} />}
         {screen === 'settings' && <SettingsScreen store={store} onBack={() => go('home')} />}
         {screen === 'memory' && <MemoryScreen store={store} onBack={() => go('home')} />}
+        {screen === 'custom-instruction' && (
+          <CustomInstructionScreen
+            instruction={store.customInstruction}
+            useReasoner={store.useReasoner}
+            onUpdate={store.updateCustomInstruction}
+            onSetReasoner={store.setUseReasoner}
+            onBack={() => go('chat')}
+          />
+        )}
         {screen === 'profile' && (
           <ProfileScreen
             userProfile={store.userProfile}

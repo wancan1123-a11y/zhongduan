@@ -2,8 +2,15 @@ export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+  thinking?: string
   timestamp: Date
   type?: 'text' | 'image' | 'game'
+}
+
+export interface CustomInstruction {
+  aboutMe: string
+  aiStyle: string
+  enabled: boolean
 }
 
 export interface Conversation {
@@ -57,4 +64,4 @@ export interface AiNote {
   createdAt: Date
 }
 
-export type Screen = 'home' | 'clock' | 'chat' | 'diary' | 'moments' | 'settings' | 'memory' | 'profile' | 'ai-profile'
+export type Screen = 'home' | 'clock' | 'chat' | 'diary' | 'moments' | 'settings' | 'memory' | 'profile' | 'ai-profile' | 'custom-instruction'

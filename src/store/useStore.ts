@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import type { Conversation, Message, DiaryEntry, Memory, Moment, MusicTrack, AiNote } from '../types'
+import type { Conversation, Message, DiaryEntry, Memory, Moment, MusicTrack, AiNote, CustomInstruction } from '../types'
 
 export interface UserProfile {
   avatar: string
@@ -59,6 +59,10 @@ export function useStore() {
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
     try { return JSON.parse(localStorage.getItem('t_profile') || 'null') || DEFAULT_PROFILE } catch { return DEFAULT_PROFILE }
   })
+  const [customInstruction, setCustomInstruction] = useState<CustomInstruction>(() => {
+    try { return JSON.parse(localStorage.getItem('t_custom') || 'null') || { aboutMe: '', aiStyle: '', enabled: false } } catch { return { aboutMe: '', aiStyle: '', enabled: false } }
+  })
+  const [useReasoner, setUseReasonerState] = useState<boolean>(() => localStorage.getItem('t_reasoner') === 'true')
 
   const currentConversation = conversations.find(c => c.id === currentConvId) || conversations[0]
 
@@ -132,10 +136,20 @@ export function useStore() {
     setUserProfile(p); localStorage.setItem('t_profile', JSON.stringify(p))
   }, [])
 
+  const updateCustomInstruction = useCallback((c: CustomInstruction) => {
+    setCustomInstruction(c); localStorage.setItem('t_custom', JSON.stringify(c))
+  }, [])
+
+  const setUseReasoner = useCallback((v: boolean) => {
+    setUseReasonerState(v); localStorage.setItem('t_reasoner', String(v))
+  }, [])
+
+
   return {
     conversations, currentConvId, currentConversation,
     diary, memories, moments, tracks, aiNotes, userProfile,
-    updateUserProfile,
+    customInstruction, useReasoner,
+    updateUserProfile, updateCustomInstruction, setUseReasoner,
     setCurrentConvId, addMessage, updateLastMessage, updateConvSettings,
     addMemory, deleteMemory, addDiary, updateDiary,
     addMoment, toggleLike, addComment, addTrack, addAiNote,
