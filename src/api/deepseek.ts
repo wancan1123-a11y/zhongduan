@@ -46,7 +46,7 @@ function buildSystem(ctx: AppContext): string {
 
   // 记忆库
   if (memories.length) {
-    base += `\n\n【你记得关于用户的事】\n${memories.slice(0, 15).map(m => `- ${m.content}`).join('\n')}`
+    base += `\n\n【你和用户之间的重要记忆（这些是你们真实经历过的，请自然融入对话）】\n${memories.slice(0, 10).map(m => `• ${m.content}`).join('\n')}`
   }
 
   // 最近日记（只看用户写的，非AI）
