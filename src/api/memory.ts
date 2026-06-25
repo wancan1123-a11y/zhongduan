@@ -1,18 +1,11 @@
 const OMBRE_URL = import.meta.env.VITE_OMBRE_URL || 'http://115.29.222.195:8000'
+const PUSH_URL = OMBRE_URL.replace(':8000', ':8001')
 
 export async function retrieveMemories(query: string): Promise<string[]> {
   try {
-    const res = await fetch(`${OMBRE_URL}/mcp`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0', id: 1, method: 'tools/call',
-        params: { name: 'trace', arguments: { query, limit: 10 } }
-      }),
-    })
+    const res = await fetch(`${PUSH_URL}/search-memory?q=${encodeURIComponent(query)}`)
     const data = await res.json()
-    const text: string = data?.result?.content?.[0]?.text || ''
-    return text.split('\n').filter((l: string) => l.trim().startsWith('-')).map((l: string) => l.slice(1).trim())
+    return (data.results || []) as string[]
   } catch { return [] }
 }
 
