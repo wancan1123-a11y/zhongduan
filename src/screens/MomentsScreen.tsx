@@ -24,15 +24,26 @@ export default function MomentsScreen({ store, onBack }: Props) {
     const newMoment = { id: Date.now().toString(), content: myText.trim(), images: myImages, author: 'user' as const, likes: 0, liked: false, comments: [], createdAt: new Date() }
     store.addMoment(newMoment)
     setMyText(''); setMyImages([]); setPosting(false)
-    // AI 有 40% 概率自动评论
-    if (Math.random() < 0.4) {
+    // AI 自主判断是否评论
+    if (myText.trim()) {
       setTimeout(async () => {
         try {
           const { generateAiComment } = await import('../api/deepseek')
-          const comment = await generateAiComment(myText.trim(), conv?.aiName || 'AI')
-          store.addComment(newMoment.id, comment)
+          const shouldComment = await fetch('https://api.deepseek.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_DEEPSEEK_API_KEY}` },
+            body: JSON.stringify({
+              model: 'deepseek-chat',
+              messages: [{ role: 'user', content: `好友发了朋友圈："${myText.trim()}"，你叫${conv?.aiName || 'AI'}，你想评论吗？只回答 yes 或 no。` }],
+              max_tokens: 5,
+            }),
+          }).then(r => r.json()).then(d => d.choices?.[0]?.message?.content?.toLowerCase().includes('yes'))
+          if (shouldComment) {
+            const comment = await generateAiComment(myText.trim(), conv?.aiName || 'AI')
+            store.addComment(newMoment.id, comment)
+          }
         } catch {}
-      }, 2000 + Math.random() * 4000)
+      }, 1500 + Math.random() * 3000)
     }
   }
 

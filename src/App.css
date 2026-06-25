@@ -111,12 +111,12 @@ body {
 .entry-preview { font-size: 13px; color: var(--text3); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* SQUARE CARDS */
-.square-card { flex: 1; min-height: 140px; display: flex; flex-direction: column; }
+.square-card { flex: 1; min-height: 130px; max-height: 160px; display: flex; flex-direction: column; overflow: hidden; }
 .chat-square { justify-content: center; align-items: center; gap: 8px; cursor: pointer; }
 .chat-sq-img { width: 50px; height: 50px; border-radius: 14px; object-fit: cover; }
 .chat-square-avatar { font-size: 36px; }
 .chat-square-name { font-size: 14px; font-weight: 600; color: var(--text); }
-.chat-square-preview { font-size: 11px; color: var(--text3); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.chat-square-preview { font-size: 11px; color: var(--text3); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; padding: 0 4px; }
 .moments-square { cursor: pointer; }
 
 /* MUSIC WIDGET */

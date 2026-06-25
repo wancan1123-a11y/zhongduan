@@ -40,24 +40,45 @@ export default function ChatScreen({ store, onBack, onViewProfile }: Props) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [conv?.messages?.length])
 
-  // AI 自主行为：对话后随机发动态或写日记
-  const aiAutonomousAction = async (_userText: string, _aiReply: string) => {
-    const rand = Math.random()
-    if (rand < 0.15) { // 15% 概率发朋友圈
-      try {
-        const text = await generateMoment(store.memories, conv?.aiName || 'AI')
-        store.addMoment({ id: Date.now().toString(), content: text, images: [], author: 'ai', likes: 0, liked: false, comments: [], createdAt: new Date() })
-      } catch {}
-    } else if (rand < 0.25) { // 10% 概率写日记
-      try {
+  // AI 自主判断：让 AI 自己决定是否发朋友圈或写日记
+  const aiAutonomousAction = async (userText: string, aiReply: string) => {
+    try {
+      const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_DEEPSEEK_API_KEY}` },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: [{
+            role: 'user',
+            content: `根据这段对话，以JSON格式回答（不要其他内容）：
+用户说：${userText}
+你回复：${aiReply}
+
+回答格式：{"post_moment": true/false, "write_diary": true/false}
+post_moment=true 表示你想发一条朋友圈分享此刻的心情
+write_diary=true 表示你想写今天的日记`
+          }],
+          max_tokens: 50,
+        }),
+      })
+      const data = await res.json()
+      const text = data.choices?.[0]?.message?.content || '{}'
+      const match = text.match(/\{.*\}/)
+      if (!match) return
+      const decision = JSON.parse(match[0])
+      if (decision.post_moment) {
+        const momentText = await generateMoment(store.memories, conv?.aiName || 'AI')
+        store.addMoment({ id: Date.now().toString(), content: momentText, images: [], author: 'ai', likes: 0, liked: false, comments: [], createdAt: new Date() })
+      }
+      if (decision.write_diary) {
         const today = new Date().toISOString().slice(0,10)
         const alreadyWrote = store.diary.some((d: any) => d.date === today && d.mood === '🤖')
         if (!alreadyWrote) {
-          const content = await generateAiDiary(store.memories, today)
-          store.addDiary({ id: Date.now().toString(), date: today, content, mood: '🤖', createdAt: new Date() })
+          const diaryContent = await generateAiDiary(store.memories, today)
+          store.addDiary({ id: Date.now().toString(), date: today, content: diaryContent, mood: '🤖', createdAt: new Date() })
         }
-      } catch {}
-    }
+      }
+    } catch {}
   }
 
   const handleSend = async (text?: string) => {
@@ -77,7 +98,7 @@ export default function ChatScreen({ store, onBack, onViewProfile }: Props) {
       let acc = ''
       await sendMessage(allMsgs, allMems, conv.aiName, chunk => { acc += chunk; store.updateLastMessage(conv.id, acc) })
       extractMemories(t, acc).then((facts: string[]) => facts.forEach((f: string) => { store.addMemory(f, conv.id); saveMemory(f) }))
-      aiAutonomousAction(t, acc)
+      aiAutonomousAction(t, acc) // non-blocking
     } catch (e: any) { store.updateLastMessage(conv.id, `❌ ${e.message}`) }
     setLoading(false)
   }
@@ -174,6 +195,7 @@ export default function ChatScreen({ store, onBack, onViewProfile }: Props) {
             <div key={msg.id}>
               {timeLabel && <div className="wc-time-label">{timeLabel}</div>}
               <div className={`wc-msg-row ${msg.role}`}>
+                {/* AI: avatar first then bubble (normal order) */}
                 {msg.role === 'assistant' && (
                   <div className="wc-av ai" onClick={onViewProfile}>
                     {conv?.aiAvatar?.startsWith('data:')
@@ -181,11 +203,7 @@ export default function ChatScreen({ store, onBack, onViewProfile }: Props) {
                       : conv?.aiAvatar}
                   </div>
                 )}
-                <div className={`wc-bubble ${msg.role}`}>
-                  {isImgMsg(msg.content)
-                    ? <img src={getImgSrc(msg.content)} className="wc-chat-img" alt="" />
-                    : msg.content || (msg.role === 'assistant' && loading ? <span className="typing">···</span> : null)}
-                </div>
+                {/* User: avatar first, then bubble — row-reverse makes bubble appear LEFT of avatar */}
                 {msg.role === 'user' && (
                   <div className="wc-av user">
                     {store.userProfile?.avatar?.startsWith('data:')
@@ -193,6 +211,11 @@ export default function ChatScreen({ store, onBack, onViewProfile }: Props) {
                       : (store.userProfile?.avatar || '我')}
                   </div>
                 )}
+                <div className={`wc-bubble ${msg.role}`}>
+                  {isImgMsg(msg.content)
+                    ? <img src={getImgSrc(msg.content)} className="wc-chat-img" alt="" />
+                    : msg.content || (msg.role === 'assistant' && loading ? <span className="typing">···</span> : null)}
+                </div>
               </div>
             </div>
           )
